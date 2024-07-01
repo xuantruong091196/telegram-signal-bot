@@ -9,7 +9,7 @@ import {
 import { of, throwError } from 'rxjs';
 import { AlertsService } from './alerts.service';
 
-const TELEGRAM_CHAT_ID = 'telegram_chat_id';
+const TELEGRAM_CHAT_ID = '998223936';
 
 const mockTelegramService = () => ({
   sendMessage: jest.fn(),
@@ -49,7 +49,6 @@ describe('AlertsService', () => {
   describe('process', () => {
     const message = `
     Buy Alert!
-
     Exchange: BINANCE
     Pair: BTCUSDT
     Price: 20000`;
