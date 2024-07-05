@@ -6,6 +6,7 @@ import { validationSchema } from './config/schema';
 import * as Joi from '@hapi/joi';
 import app from './config/app.config';
 import telegram from './config/telegram.config';
+import { BingxService } from './bingx/bingx.service';
 
 const routes: Routes = [
   {
@@ -29,6 +30,6 @@ const routes: Routes = [
     AlertsModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [BingxService],
 })
 export class AppModule {}

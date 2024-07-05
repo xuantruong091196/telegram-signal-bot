@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { TelegramModule } from 'nestjs-telegram';
 import { AlertsController } from './alerts.controller';
 import { AlertsService } from './alerts.service';
+import { BingxService } from 'src/bingx/bingx.service';
 
 @Module({
   imports: [
@@ -16,6 +17,6 @@ import { AlertsService } from './alerts.service';
     }),
   ],
   controllers: [AlertsController],
-  providers: [AlertsService],
+  providers: [AlertsService, BingxService],
 })
 export class AlertsModule {}
