@@ -11,7 +11,7 @@ import { catchError, map } from 'rxjs/operators';
 import { Observable, throwError } from 'rxjs';
 import { TelegramMessage } from 'nestjs-telegram/dist/interfaces/telegramTypes.interface';
 import { BingxService } from '../bingx/bingx.service';
-import { generateParams } from 'src/config/app.config';
+import { generateParams } from 'src/config/constant';
 @Injectable()
 export class AlertsService {
   private readonly logger = new Logger(AlertsService.name);
@@ -23,7 +23,9 @@ export class AlertsService {
   ) {}
 
   process(message: string): Observable<TelegramMessage> {
-    this.bingxService.createOrder(generateParams(message));
+    const params = generateParams(message);
+    console.log(params);
+    this.bingxService.createOrder(params);
     return this.telegramService
       .sendMessage({
         chat_id: this.configService.get<string>('telegram.chatId'),

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { bingx } from 'src/config/app.config';
+import { bingx } from 'src/config/constant';
 import { LEVERAGE } from 'src/config/constant';
 
 @Injectable()
@@ -12,12 +12,11 @@ export class BingxService {
     takeProfit: string;
     stopLoss: string;
   }) {
-    await bingx.setMarginMode('isolated', params.symbol, params);
     await bingx.setLeverage(LEVERAGE, params.symbol, params);
     await bingx.createOrder(
       params.symbol,
       'limit',
-      params.side.toLowerCase(),
+      params.positionSide.toUppercase(),
       5,
       params.price,
       params,
