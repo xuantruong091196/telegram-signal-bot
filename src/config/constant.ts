@@ -39,9 +39,8 @@ export function generateParams(str) {
   const [symbol, side, price] = str.split(' ');
   const modifiedSymbol = symbol.replace(/(\w+)(USDT)/, '$1-$2');
   const { TP, SL } = calculateTPSLWithLeverage(Number(price), LEVERAGE);
-  console.log(modifiedSymbol);
   const result = {
-    symbol: symbol,
+    symbol: modifiedSymbol,
     side: POSTITION_TYPE[side],
     price: parseFloat(price),
     positionSide: POSTITION_TYPE[side],
