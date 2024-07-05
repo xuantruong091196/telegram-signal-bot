@@ -2,7 +2,7 @@
 
 const ccxt = require('ccxt');
 
-export const LEVERAGE = 20;
+export const LEVERAGE = 10;
 const API_KEY = process.env.BING_X_API_KEY;
 const API_SECRET = process.env.BING_X_SECRET_KEY;
 
@@ -22,12 +22,8 @@ function calculateTPSLWithLeverage(price, leverage) {
   if (typeof leverage !== 'number' || leverage <= 0) {
     throw new Error('Invalid leverage value');
   }
-
-  const tpPercentage = 0.6; // TP at 60% increase
-  const slPercentage = 0.3; // SL at 30% decrease
-
-  const TP = price * (1 + tpPercentage * leverage);
-  const SL = price * (1 - slPercentage * leverage);
+  const TP = price + (60 * price) / 100 / leverage;
+  const SL = price - (30 * price) / 100 / leverage;
 
   return {
     TP: TP.toFixed(2),
