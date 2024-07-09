@@ -3,8 +3,8 @@
 const ccxt = require('ccxt');
 
 export const LEVERAGE = 10;
-const API_KEY = process.env.BING_X_API_KEY;
-const API_SECRET = process.env.BING_X_SECRET_KEY;
+export const API_KEY = process.env.BING_X_API_KEY;
+export const API_SECRET = process.env.BING_X_SECRET_KEY;
 
 export const bingx = new ccxt.bingx({
   apiKey: API_KEY,
@@ -41,9 +41,37 @@ export function generateParams(str) {
     side: POSTITION_TYPE[side],
     price: parseFloat(price),
     positionSide: POSTITION_TYPE[side],
-    takeProfit: `{"type": "TAKE_PROFIT_MARKET", "stopPrice": ${TP},"price": ${price},"workingType":"TRIGGER_MARKET"}`,
-    stopLoss: `{"type": "STOP_MARKET", "stopPrice": ${SL},"price": ${price},"workingType":"TRIGGER_MARKET"}`,
+    takeProfit: {
+      type: 'TAKE_PROFIT_MARKET',
+      stopPrice: TP,
+      price: price,
+      workingType: 'TRIGGER_MARKET',
+    },
+    stopLoss: {
+      type: 'STOP_MARKET',
+      stopPrice: SL,
+      price: price,
+      workingType: 'TRIGGER_MARKET',
+    },
     type: 'limit',
   };
   return result;
+}
+
+export function getParameters(payload, timestamp, urlEncode = false) {
+  let parameters = '';
+  for (const key in payload) {
+    if (urlEncode) {
+      parameters += key + '=' + encodeURIComponent(payload[key]) + '&';
+    } else {
+      parameters += key + '=' + payload[key] + '&';
+    }
+  }
+  if (parameters) {
+    parameters = parameters.substring(0, parameters.length - 1);
+    parameters = parameters + '&timestamp=' + timestamp;
+  } else {
+    parameters = 'timestamp=' + timestamp;
+  }
+  return parameters;
 }

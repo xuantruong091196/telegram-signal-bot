@@ -1,26 +1,62 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { bingx } from 'src/config/constant';
+import {
+  API_KEY,
+  API_SECRET,
+  bingx,
+  generateParams,
+  getParameters,
+} from 'src/config/constant';
 import { LEVERAGE } from 'src/config/constant';
-
+import CryptoJS from 'crypto-js';
+import axios from 'axios';
 @Injectable()
 export class BingxService {
-  async createOrder(params: {
-    symbol: any;
-    side: string;
-    price: number;
-    positionSide: any;
-    takeProfit: string;
-    stopLoss: string;
-  }) {
-    // await bingx.setLeverage(LEVERAGE, params.symbol, params);
-    // await bingx.createOrder(
-    //   params.symbol,
-    //   'limit',
-    //   params.positionSide.toUppercase(),
-    //   5,
-    //   params.price,
-    //   params,
-    // );
-    Logger.log(params)
+  async bingXOpenApiTest(path, method, payload) {
+    const timestamp = new Date().getTime();
+    const sign = CryptoJS.enc.Hex.stringify(
+      CryptoJS.HmacSHA256(getParameters(payload, timestamp), API_SECRET),
+    );
+    const url =
+      'https' +
+      '://' +
+      'open-api.bingx.com' +
+      path +
+      '?' +
+      getParameters(payload, timestamp, true) +
+      '&signature=' +
+      sign;
+    const config = {
+      method: method,
+      url: url,
+      headers: {
+        'X-BX-APIKEY': API_KEY,
+      },
+      transformResponse: (resp) => {
+        Logger.log(resp);
+        return resp;
+      },
+    };
+    const resp = await axios(config);
+    Logger.log(resp.status);
+    Logger.log(resp.data);
+  }
+  async createOrder(params) {
+    return await this.bingXOpenApiTest(
+      '/openApi/swap/v2/user/balance',
+      'POST',
+      params,
+    );
+  }
+  async setLeverange(params) {
+    const { symbol, side } = params;
+    return await this.bingXOpenApiTest(
+      '/openApi/swap/v2/trade/leverage',
+      'POST',
+      {
+        symbol,
+        side,
+        leverage: 10,
+      },
+    );
   }
 }

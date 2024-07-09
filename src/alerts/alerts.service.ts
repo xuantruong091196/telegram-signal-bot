@@ -33,7 +33,7 @@ export class AlertsService {
         parse_mode: 'html',
       })
       .pipe(
-        map((res) => {
+        map((res: any) => {
           this.logger.verbose(
             `Successfully sent message with id ${res.message_id}!`,
           );
