@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 
+import { Logger } from '@nestjs/common';
+
 const ccxt = require('ccxt');
 
 export const LEVERAGE = 10;
-export const API_KEY = process.env.BING_X_API_KEY;
-export const API_SECRET = process.env.BING_X_SECRET_KEY;
+export const API_KEY =
+  'yje4IfdYeeqfejZQQvirUFWILe2XFAEX7re0Mby8nOFovQC6GA1IGoPiryNn2zOxfOMe190cZdSHsY1u3P1Rdg';
+export const API_SECRET =
+  'UBTcnxOch11arDwftRdBzLeEo7VvUiXYLZYurGrjPCDli2diul93RM5LXK7DVykhgRn6GeOmozxWiJwmd8w';
 
 export const bingx = new ccxt.bingx({
   apiKey: API_KEY,
@@ -31,14 +35,25 @@ function calculateTPSLWithLeverage(price, leverage) {
   };
 }
 
+function splitSymbol(symbol) {
+  const suffix = 'USDT';
+  if (symbol.endsWith(suffix)) {
+    const base = symbol.slice(0, -suffix.length);
+    return `${base}-${suffix}`;
+  } else {
+    // Trường hợp không hợp lệ, bạn có thể xử lý tùy ý
+    throw new Error("Symbol does not end with 'USDT'");
+  }
+}
+
 export function generateParams(str) {
   const [symbol, side, price] = str.split(' ');
-  const modifiedSymbol = symbol.replace(/(\w+)(USDT)/, '$1-$2');
+  const modifiedSymbol = splitSymbol(symbol);
   const { TP, SL } = calculateTPSLWithLeverage(Number(price), LEVERAGE);
   console.log(modifiedSymbol);
   const result = {
     symbol: modifiedSymbol,
-    side: POSTITION_TYPE[side],
+    side,
     price: parseFloat(price),
     positionSide: POSTITION_TYPE[side],
     takeProfit: {
@@ -55,6 +70,7 @@ export function generateParams(str) {
     },
     type: 'limit',
   };
+  Logger.log(result);
   return result;
 }
 

@@ -1,20 +1,15 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  API_KEY,
-  API_SECRET,
-  bingx,
-  generateParams,
-  getParameters,
-} from 'src/config/constant';
-import { LEVERAGE } from 'src/config/constant';
-import CryptoJS from 'crypto-js';
+import { API_KEY, API_SECRET, getParameters } from 'src/config/constant';
 import axios from 'axios';
+const CryptoJS = require('crypto-js');
 @Injectable()
 export class BingxService {
   async bingXOpenApiTest(path, method, payload) {
     const timestamp = new Date().getTime();
+    const params = getParameters(payload, timestamp);
     const sign = CryptoJS.enc.Hex.stringify(
-      CryptoJS.HmacSHA256(getParameters(payload, timestamp), API_SECRET),
+      CryptoJS.HmacSHA256(params || '', API_SECRET),
     );
     const url =
       'https' +
