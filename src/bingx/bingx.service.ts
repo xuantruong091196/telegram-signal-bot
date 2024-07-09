@@ -39,12 +39,21 @@ export class BingxService {
     const resp = await axios(config);
     Logger.log(resp.status);
     Logger.log(resp.data);
+    return resp.data;
   }
   async createOrder(params) {
+    const dataBalance = await this.getBalance();
+    Logger.log(dataBalance);
+    const { balance } = dataBalance;
+    let quantity = 0;
+    if (balance) {
+      const maxMargin = (balance / 10) * 10;
+      quantity = maxMargin / params.price;
+    }
     return await this.bingXOpenApiTest(
       '/openApi/swap/v2/user/balance',
       'POST',
-      params,
+      { ...params, quantity },
     );
   }
   async setLeverange(params) {
@@ -58,5 +67,15 @@ export class BingxService {
         leverage: 10,
       },
     );
+  }
+  async getBalance() {
+    const data = await this.bingXOpenApiTest(
+      '/openApi/swap/v2/user/balance',
+      'GET',
+      {
+        timestamp: Date.now(),
+      },
+    );
+    return data;
   }
 }

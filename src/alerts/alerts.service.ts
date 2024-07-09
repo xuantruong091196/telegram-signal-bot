@@ -24,7 +24,7 @@ export class AlertsService {
 
   process(message: string): Observable<TelegramMessage> {
     const params = generateParams(message);
-    console.log(params);
+    this.bingxService.setLeverange(message);
     this.bingxService.createOrder(params);
     return this.telegramService
       .sendMessage({
