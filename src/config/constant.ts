@@ -15,10 +15,6 @@ export const bingx = new ccxt.bingx({
   secret: API_SECRET,
 });
 
-const POSTITION_TYPE = {
-  BUY: 'LONG',
-  SELL: 'SHORT',
-};
 function calculateTPSLWithLeverage(price, leverage) {
   if (typeof price !== 'number' || price <= 0) {
     throw new Error('Invalid price value');
@@ -55,7 +51,7 @@ export function generateParams(str) {
     symbol: modifiedSymbol,
     side,
     price: parseFloat(price),
-    positionSide: POSTITION_TYPE[side],
+    positionSide: side,
     takeProfit: {
       type: 'TAKE_PROFIT_MARKET',
       stopPrice: TP,
