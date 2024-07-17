@@ -37,8 +37,6 @@ function splitSymbol(symbol) {
     const base = symbol.slice(0, -suffix.length);
     return `${base}-${suffix}`;
   } else {
-    // Trường hợp không hợp lệ, bạn có thể xử lý tùy ý
-    throw new Error("Symbol does not end with 'USDT'");
   }
 }
 
@@ -66,7 +64,6 @@ export function generateParams(str) {
     },
     type: 'limit',
   };
-  Logger.log(result);
   return result;
 }
 
