@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { DivergenceService } from '../divergence/divergence.service';
 import { AlertsService } from 'src/alerts/alerts.service';
 
 @Injectable()
-export class ScheduledTaskService {
+export class ScheduledTaskService implements OnModuleInit {
   private readonly symbols = [
     'BTC/USDT',
     'ETH/USDT',
@@ -151,24 +151,42 @@ export class ScheduledTaskService {
     'LOKA/USDT',
     'TUSD/USDT',
   ];
-  private readonly timeframes = ['15m', '1h', '4h'];
+  private readonly timeframes = ['1h', '4h'];
 
   constructor(
     private readonly divergenceService: DivergenceService,
     private readonly alertService: AlertsService,
   ) {}
-
-  @Cron('0 */2 * * *')
+  async onModuleInit() {
+    await this.runTask();
+  }
+  @Cron(CronExpression.EVERY_2_HOURS)
   async handleCron() {
     console.log('Running scheduled task for divergence analysis');
 
+    await this.runTask();
+  }
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const result: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      result.push(array.slice(i, i + size));
+    }
+    return result;
+  }
+  private async runTask() {
     const results = await this.divergenceService.analyzeDivergence(
       this.symbols,
       this.timeframes,
     );
+    if (results && results.length > 0) {
+      const chunkSize = Math.ceil(results.length / 5); // Chia thành 5 nhóm
+      const chunks = this.chunkArray(results, chunkSize);
 
-    if (results.length > 0) {
-      this.alertService.process(results.join(','));
+      for (const chunk of chunks) {
+        await Promise.all(
+          chunk.map((result) => this.alertService.process(result).toPromise()),
+        );
+      }
     } else {
       console.log('No divergences found.');
     }

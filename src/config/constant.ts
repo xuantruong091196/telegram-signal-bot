@@ -44,7 +44,6 @@ export function generateParams(str) {
   const [symbol, side, price] = str.split(' ');
   const modifiedSymbol = splitSymbol(symbol);
   const { TP, SL } = calculateTPSLWithLeverage(Number(price), LEVERAGE);
-  console.log(modifiedSymbol);
   const result = {
     symbol: modifiedSymbol,
     side,

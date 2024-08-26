@@ -19,13 +19,9 @@ export class AlertsService {
   constructor(
     private readonly telegramService: TelegramService,
     private readonly configService: ConfigService,
-    private readonly bingxService: BingxService,
   ) {}
 
   process(message: string): Observable<TelegramMessage> {
-    const params = generateParams(message);
-    this.bingxService.setLeverange(message);
-    this.bingxService.createOrder(params);
     return this.telegramService
       .sendMessage({
         chat_id: this.configService.get<string>('telegram.chatId'),
@@ -40,6 +36,17 @@ export class AlertsService {
           return res;
         }),
         catchError((err: any) => {
+          if (
+            err.response?.statusCode === 429 ||
+            err.response?.statusCode === 400
+          ) {
+            this.logger.warn('Rate limit exceeded. Retrying after delay...');
+            return new Observable((observer) => {
+              setTimeout(() => {
+                this.process(message).subscribe(observer);
+              }, 20000);
+            });
+          }
           return this.processError(err);
         }),
       );
@@ -47,8 +54,6 @@ export class AlertsService {
 
   private processError(err: any): Observable<never> {
     if (err.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
       this.logger.error(
         `ERROR: ${err.response?.message} (status: ${err.response?.statusCode}) - Please check your TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID environment variables and your network connection.`,
       );
@@ -56,13 +61,11 @@ export class AlertsService {
         new HttpException(err.response?.message, err.response?.statusCode),
       );
     } else if (err.request) {
-      // The request was made but no response was received from the server
       this.logger.error(`${err.message} - ${err.config.url}`);
       return throwError(
         new ServiceUnavailableException(`${err.message} - ${err.config.url}`),
       );
     } else {
-      // Something happened in setting up the request that triggered an Error
       this.logger.error(`${err.message}`);
       return throwError(new InternalServerErrorException(err.message));
     }

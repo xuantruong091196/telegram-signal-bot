@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as ccxt from 'ccxt';
 import * as moment from 'moment';
 import { RSI } from 'technicalindicators';
@@ -170,7 +170,6 @@ export class DivergenceService {
       const [, bType, bTimeframe] = b.split(' - ');
       return aType.localeCompare(bType) || aTimeframe.localeCompare(bTimeframe);
     });
-
     return results;
   }
 }
