@@ -18,5 +18,6 @@ import { BingxService } from 'src/bingx/bingx.service';
   ],
   controllers: [AlertsController],
   providers: [AlertsService, BingxService],
+  exports: [AlertsService],
 })
 export class AlertsModule {}

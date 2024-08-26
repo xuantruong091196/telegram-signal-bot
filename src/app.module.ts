@@ -7,6 +7,9 @@ import * as Joi from '@hapi/joi';
 import app from './config/app.config';
 import telegram from './config/telegram.config';
 import { BingxService } from './bingx/bingx.service';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ScheduledTaskService } from './schedule/schedule.services';
+import { DivergenceService } from './divergence/divergence.service';
 
 const routes: Routes = [
   {
@@ -28,8 +31,9 @@ const routes: Routes = [
     }),
     RouterModule.forRoutes(routes),
     AlertsModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [],
-  providers: [BingxService],
+  providers: [BingxService, ScheduledTaskService, DivergenceService],
 })
 export class AppModule {}
