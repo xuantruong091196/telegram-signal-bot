@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as ccxt from 'ccxt';
 import { RSI } from 'technicalindicators';
-import moment from 'moment';
+import * as dayjs from 'dayjs';
 @Injectable()
 export class DivergenceService {
   private readonly exchange;
@@ -10,24 +10,30 @@ export class DivergenceService {
     this.exchange = new ccxt.binance({
       apiKey:
         process.env.BINANCE_API_KEY ||
-        'fzn8Mo9PRwHMIwSY3B7fNLwrZ6ti2ra2W0ocWusB1cXsKHIkM5pdd9DHAp0b0rMB',
+        'c8m2NnLqCkHpykHJs9nr1lppWROD5IZcjko5S2Z0QpP1EzJCPA4bqNFQFhwfdtqy',
       secret:
         process.env.BINANCE_SECRET_KEY ||
-        'qg3dwAXtI2DlzDLZK2jFO19WHym6XpmTnOF5zQF48wlI7WvTilg6v5PE7vq4zBVT',
+        'Our8Q0Jzug4M4LXDQTuHuFr7QLGgY8AtQw1Ax8X5EDyHPDoPDu0sXeYTQacV2fFQ',
       enableRateLimit: true,
     });
   }
-
   async getOHLCV(symbol: string, timeframe: string, limit: number) {
-    const ohlcv = await this.exchange.fetchOHLCV(symbol, timeframe, limit);
-    return ohlcv.map((item) => ({
-      timestamp: moment(item[0]).format('YYYY-MM-DD HH:mm:ss'),
-      open: item[1],
-      high: item[2],
-      low: item[3],
-      close: item[4],
-      volume: item[5],
-    }));
+    const ohlcv = await this.exchange.fetchOHLCV(
+      symbol,
+      timeframe,
+      undefined,
+      limit,
+    );
+    return ohlcv.map((item) => {
+      return {
+        timestamp: dayjs(item[0]).format('YYYY-MM-DD HH:mm:ss'),
+        open: item[1],
+        high: item[2],
+        low: item[3],
+        close: item[4],
+        volume: item[5],
+      };
+    });
   }
 
   // Tính toán RSI
@@ -97,7 +103,7 @@ export class DivergenceService {
     timeframe: string,
     checkPeriod: number,
   ) {
-    const df = await this.getOHLCV(symbol, timeframe, 500); // Lấy dữ liệu OHLCV
+    const df = await this.getOHLCV(symbol, timeframe, 500);
     const closes = df.map((row) => row.close);
     const highs = df.map((row) => row.high);
     const lows = df.map((row) => row.low);
@@ -144,7 +150,6 @@ export class DivergenceService {
     return null;
   }
 
-  // Kiểm tra phân kỳ đáy
   detectTroughDivergence(troughs: any[]): string | null {
     for (let i = 1; i < troughs.length; i++) {
       const currentTrough = troughs[i];
