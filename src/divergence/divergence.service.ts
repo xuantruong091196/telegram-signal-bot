@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 import { Injectable, Logger } from '@nestjs/common';
 import * as ccxt from 'ccxt';
 import { RSI } from 'technicalindicators';
@@ -36,152 +37,160 @@ export class DivergenceService {
     });
   }
 
-  // Tính toán RSI
-  calculateRSI(closes: number[]): number[] {
-    return RSI.calculate({ values: closes, period: 14 });
+  calculateRSI(data, period = 14) {
+    const closePrices = data.map((candle) => candle.close);
+    const rsi = RSI.calculate({ values: closePrices, period: period });
+    // Gắn RSI vào mỗi cây nến
+    data.forEach((candle, index) => {
+      candle.rsi = rsi[index - period + 1] || null; // Gán null nếu không có đủ dữ liệu cho RSI
+    });
+    return data;
   }
-
-  // Lọc các điểm HH và LL
-  filterExtremes(data: any[], column: string, threshold: number): any[] {
-    const filtered = [];
+  filterExtremes(data, column, threshold) {
+    let filtered = [];
     let group = [];
 
-    for (const item of data) {
-      if (!group.length) {
-        group.push(item);
+    for (let i = 0; i < data.length; i++) {
+      const current = data[i];
+      if (group.length === 0) {
+        group.push(current);
       } else {
         const last = group[group.length - 1];
-        if (Math.abs(item[column] - last[column]) / last[column] <= threshold) {
-          group.push(item);
+        const diff = Math.abs((current[column] - last[column]) / last[column]);
+        if (diff <= threshold) {
+          group.push(current);
         } else {
-          // Thêm giá trị cao nhất hoặc thấp nhất trong nhóm
+          // Thêm giá trị cao nhất/thấp nhất trong nhóm
           if (column === 'high') {
             filtered.push(
-              group.reduce(
-                (max, curr) => (curr.high > max.high ? curr : max),
-                group[0],
-              ),
+              group.reduce((max, item) => (item.high > max.high ? item : max)),
             );
           } else if (column === 'low') {
             filtered.push(
-              group.reduce(
-                (min, curr) => (curr.low < min.low ? curr : min),
-                group[0],
-              ),
+              group.reduce((min, item) => (item.low < min.low ? item : min)),
             );
           }
-          group = [item];
+          group = [current];
         }
       }
     }
 
     // Thêm nhóm cuối cùng
-    if (group.length) {
+    if (group.length > 0) {
       if (column === 'high') {
         filtered.push(
-          group.reduce(
-            (max, curr) => (curr.high > max.high ? curr : max),
-            group[0],
-          ),
+          group.reduce((max, item) => (item.high > max.high ? item : max)),
         );
       } else if (column === 'low') {
         filtered.push(
-          group.reduce(
-            (min, curr) => (curr.low < min.low ? curr : min),
-            group[0],
-          ),
+          group.reduce((min, item) => (item.low < min.low ? item : min)),
         );
       }
     }
 
     return filtered;
   }
+  // Hàm kiểm tra phân kỳ gần nhất
+  checkLatestDivergence(data, symbol, timeframe, checkPeriod) {
+    const peakMinDistances = {
+      '15m': 0.01,
+      '30m': 0.015,
+      '1h': 0.02,
+      '4h': 0.05,
+    };
 
-  // Kiểm tra phân kỳ gần nhất
-  async checkLatestDivergence(
-    symbol: string,
-    timeframe: string,
-    checkPeriod: number,
-  ) {
-    const df = await this.getOHLCV(symbol, timeframe, 500);
-    const closes = df.map((row) => row.close);
-    const highs = df.map((row) => row.high);
-    const lows = df.map((row) => row.low);
+    const troughMinDistances = {
+      '15m': 0.01,
+      '30m': 0.015,
+      '1h': 0.02,
+      '4h': 0.05,
+    };
 
-    // Tính RSI
-    const rsiValues = this.calculateRSI(closes);
+    // Lọc các điểm cao nhất (HH) và thấp nhất (LL)
+    const hh = this.filterExtremes(data, 'high', peakMinDistances[timeframe]);
+    const ll = this.filterExtremes(data, 'low', troughMinDistances[timeframe]);
 
-    // Thêm dữ liệu RSI vào dataframe
-    df.forEach((row, index) => {
-      row.rsi = rsiValues[index];
-    });
-
-    // Lọc các điểm HH và LL
-    const filteredHH = this.filterExtremes(
-      df.filter((row) => row.high),
-      'high',
-      0.02,
-    );
-    const filteredLL = this.filterExtremes(
-      df.filter((row) => row.low),
-      'low',
-      0.02,
-    );
+    // Lọc theo điều kiện RSI
+    const validPeaks = hh.filter((candle) => candle.rsi > 50).slice(-3); // Tối đa 3 đỉnh gần nhất
+    const validTroughs = ll.filter((candle) => candle.rsi < 50).slice(-3); // Tối đa 3 đáy gần nhất
 
     // Kiểm tra phân kỳ
-    const peakDivergence = this.detectPeakDivergence(filteredHH);
-    const troughDivergence = this.detectTroughDivergence(filteredLL);
+    let latestPeakDivergence = null;
+    let latestTroughDivergence = null;
 
-    return { peakDivergence, troughDivergence };
-  }
-
-  // Kiểm tra phân kỳ đỉnh
-  detectPeakDivergence(peaks: any[]): string | null {
-    for (let i = 1; i < peaks.length; i++) {
-      const currentPeak = peaks[i];
-      const previousPeak = peaks[i - 1];
-      if (
-        currentPeak.rsi < previousPeak.rsi &&
-        currentPeak.high > previousPeak.high
-      ) {
-        return 'Phân kỳ đỉnh';
+    if (validPeaks.length >= 2) {
+      for (let i = 1; i < validPeaks.length; i++) {
+        const rsiDiff = Math.abs(validPeaks[i].rsi - validPeaks[i - 1].rsi);
+        if (
+          rsiDiff >= 5 &&
+          validPeaks[i].rsi < validPeaks[i - 1].rsi &&
+          validPeaks[i].high > validPeaks[i - 1].high
+        ) {
+          latestPeakDivergence = `${symbol} - Phân kỳ đỉnh - ${timeframe}`;
+          break;
+        }
       }
     }
-    return null;
-  }
 
-  detectTroughDivergence(troughs: any[]): string | null {
-    for (let i = 1; i < troughs.length; i++) {
-      const currentTrough = troughs[i];
-      const previousTrough = troughs[i - 1];
-      if (
-        currentTrough.rsi > previousTrough.rsi &&
-        currentTrough.low < previousTrough.low
-      ) {
-        return 'Phân kỳ đáy';
+    if (validTroughs.length >= 2) {
+      for (let i = 1; i < validTroughs.length; i++) {
+        const rsiDiff = Math.abs(validTroughs[i].rsi - validTroughs[i - 1].rsi);
+        if (
+          rsiDiff >= 5 &&
+          validTroughs[i].rsi > validTroughs[i - 1].rsi &&
+          validTroughs[i].low < validTroughs[i - 1].low
+        ) {
+          latestTroughDivergence = `${symbol} - Phân kỳ đáy - ${timeframe}`;
+          break;
+        }
       }
     }
-    return null;
+
+    return { latestPeakDivergence, latestTroughDivergence };
   }
 
-  async analyzeDivergences(symbols: string[], timeframes: string[]) {
-    const results: string[] = [];
+  async analyze(symbols, intervals) {
+    const results = [];
 
     for (const symbol of symbols) {
-      for (const timeframe of timeframes) {
-        const result = await this.checkLatestDivergence(symbol, timeframe, 1.5);
+      for (const [interval, period] of Object.entries(intervals)) {
+        const data = await this.getOHLCV(symbol, interval, 2000);
+        const dataWithRsi = this.calculateRSI(data);
+        const {
+          latestPeakDivergence,
+          latestTroughDivergence,
+        } = this.checkLatestDivergence(
+          dataWithRsi,
+          symbol,
+          interval,
+          intervals,
+        );
 
-        if (result.peakDivergence) {
-          const peakMessage = `${symbol} - ${timeframe} - ${result.peakDivergence}`;
-          results.push(peakMessage);
-        }
-
-        if (result.troughDivergence) {
-          const troughMessage = `${symbol} - ${timeframe} - ${result.troughDivergence}`;
-          results.push(troughMessage);
+        if (latestTroughDivergence) {
+          results.push({
+            interval,
+            type: 'Trough',
+            message: latestTroughDivergence,
+          });
+        } else if (latestPeakDivergence) {
+          results.push({
+            interval,
+            type: 'Peak',
+            message: latestPeakDivergence,
+          });
         }
       }
     }
+
+    // Sắp xếp kết quả
+    results.sort((a, b) => {
+      const timeframes = { '15m': 0, '30m': 1, '1h': 2, '4h': 3 };
+      return a.type === b.type
+        ? timeframes[a.interval] - timeframes[b.interval]
+        : a.type === 'Peak'
+        ? -1
+        : 1;
+    });
     return results;
   }
 }
