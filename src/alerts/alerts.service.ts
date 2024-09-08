@@ -31,7 +31,7 @@ export class AlertsService {
       .pipe(
         map((res: any) => {
           this.logger.verbose(
-            `Successfully sent message with id ${res.message_id}!`,
+            `Successfully sent message with id ${res.message_id}! `,
           );
           return res;
         }),

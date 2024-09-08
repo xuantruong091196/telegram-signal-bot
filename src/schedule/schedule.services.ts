@@ -174,7 +174,7 @@ export class ScheduledTaskService implements OnModuleInit {
     return result;
   }
   private async runTask() {
-    const results = await this.divergenceService.analyzeDivergence(
+    const results = await this.divergenceService.analyzeDivergences(
       this.symbols,
       this.timeframes,
     );

@@ -1,175 +1,182 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as ccxt from 'ccxt';
-import * as moment from 'moment';
 import { RSI } from 'technicalindicators';
-
+import moment from 'moment';
 @Injectable()
 export class DivergenceService {
   private readonly exchange;
 
   constructor() {
     this.exchange = new ccxt.binance({
-      apiKey: process.env.BINANCE_API_KEY || '',
-      secret: process.env.BINANCE_SECRET_KEY || '',
+      apiKey:
+        process.env.BINANCE_API_KEY ||
+        'fzn8Mo9PRwHMIwSY3B7fNLwrZ6ti2ra2W0ocWusB1cXsKHIkM5pdd9DHAp0b0rMB',
+      secret:
+        process.env.BINANCE_SECRET_KEY ||
+        'qg3dwAXtI2DlzDLZK2jFO19WHym6XpmTnOF5zQF48wlI7WvTilg6v5PE7vq4zBVT',
       enableRateLimit: true,
     });
   }
 
-  // Hàm lấy dữ liệu OHLCV
-  async getOhlcv(symbol: string, timeframe: string, limit = 500) {
-    const now = moment();
-    let since;
-
-    if (timeframe === '15m') {
-      since = now.subtract(2, 'days');
-    } else if (timeframe === '1h') {
-      since = now.subtract(8, 'days');
-    } else if (timeframe === '4h') {
-      since = now.subtract(24, 'days');
-    } else {
-      since = now.subtract(1, 'days');
-    }
-
-    const sinceMs = since.valueOf();
-    const ohlcv = await this.exchange.fetchOHLCV(
-      symbol,
-      timeframe,
-      sinceMs,
-      limit,
-    );
-
-    return ohlcv.map((candle) => ({
-      timestamp: new Date(candle[0]),
-      open: candle[1],
-      high: candle[2],
-      low: candle[3],
-      close: candle[4],
-      volume: candle[5],
+  async getOHLCV(symbol: string, timeframe: string, limit: number) {
+    const ohlcv = await this.exchange.fetchOHLCV(symbol, timeframe, { limit });
+    return ohlcv.map((item) => ({
+      timestamp: moment(item[0]).format('YYYY-MM-DD HH:mm:ss'),
+      open: item[1],
+      high: item[2],
+      low: item[3],
+      close: item[4],
+      volume: item[5],
     }));
   }
 
-  // Hàm lọc HH cao nhất và LL thấp nhất trong các nhóm gần nhau
-  filterExtremes(data, column: string, threshold: number) {
+  // Tính toán RSI
+  calculateRSI(closes: number[]): number[] {
+    return RSI.calculate({ values: closes, period: 14 });
+  }
+
+  // Lọc các điểm HH và LL
+  filterExtremes(data: any[], column: string, threshold: number): any[] {
     const filtered = [];
     let group = [];
 
-    for (let i = 0; i < data.length; i++) {
-      if (group.length === 0) {
-        group.push(data[i]);
+    for (const item of data) {
+      if (!group.length) {
+        group.push(item);
       } else {
-        const diff =
-          Math.abs(data[i][column] - group[group.length - 1][column]) /
-          group[group.length - 1][column];
-        if (diff <= threshold) {
-          group.push(data[i]);
+        const last = group[group.length - 1];
+        if (Math.abs(item[column] - last[column]) / last[column] <= threshold) {
+          group.push(item);
         } else {
+          // Thêm giá trị cao nhất hoặc thấp nhất trong nhóm
           if (column === 'high') {
-            filtered.push(group.reduce((a, b) => (a.high > b.high ? a : b)));
+            filtered.push(
+              group.reduce(
+                (max, curr) => (curr.high > max.high ? curr : max),
+                group[0],
+              ),
+            );
           } else if (column === 'low') {
-            filtered.push(group.reduce((a, b) => (a.low < b.low ? a : b)));
+            filtered.push(
+              group.reduce(
+                (min, curr) => (curr.low < min.low ? curr : min),
+                group[0],
+              ),
+            );
           }
-          group = [data[i]];
+          group = [item];
         }
       }
     }
 
-    if (group.length > 0) {
+    // Thêm nhóm cuối cùng
+    if (group.length) {
       if (column === 'high') {
-        filtered.push(group.reduce((a, b) => (a.high > b.high ? a : b)));
+        filtered.push(
+          group.reduce(
+            (max, curr) => (curr.high > max.high ? curr : max),
+            group[0],
+          ),
+        );
       } else if (column === 'low') {
-        filtered.push(group.reduce((a, b) => (a.low < b.low ? a : b)));
+        filtered.push(
+          group.reduce(
+            (min, curr) => (curr.low < min.low ? curr : min),
+            group[0],
+          ),
+        );
       }
     }
 
     return filtered;
   }
 
-  // Hàm kiểm tra phân kỳ giữa các đỉnh và đáy gần nhất
-  checkLatestDivergence(data, symbol: string, timeframe: string) {
-    const rsi = RSI.calculate({ values: data.map((d) => d.close), period: 14 });
+  // Kiểm tra phân kỳ gần nhất
+  async checkLatestDivergence(
+    symbol: string,
+    timeframe: string,
+    checkPeriod: number,
+  ) {
+    const df = await this.getOHLCV(symbol, timeframe, 500); // Lấy dữ liệu OHLCV
+    const closes = df.map((row) => row.close);
+    const highs = df.map((row) => row.high);
+    const lows = df.map((row) => row.low);
 
-    const hh = data.filter(
-      (d, i) =>
-        d.high > (data[i - 6]?.high || 0) && d.high > (data[i + 6]?.high || 0),
-    );
-    const ll = data.filter(
-      (d, i) =>
-        d.low < (data[i - 6]?.low || 0) && d.low < (data[i + 6]?.low || 0),
-    );
+    // Tính RSI
+    const rsiValues = this.calculateRSI(closes);
 
-    const peakMinDistances = { '15m': 0.01, '1h': 0.02, '4h': 0.04 };
-    const troughMinDistances = { '15m': 0.01, '1h': 0.02, '4h': 0.04 };
+    // Thêm dữ liệu RSI vào dataframe
+    df.forEach((row, index) => {
+      row.rsi = rsiValues[index];
+    });
 
-    const filteredHh = this.filterExtremes(
-      hh,
+    // Lọc các điểm HH và LL
+    const filteredHH = this.filterExtremes(
+      df.filter((row) => row.high),
       'high',
-      peakMinDistances[timeframe],
+      0.02,
     );
-    const filteredLl = this.filterExtremes(
-      ll,
+    const filteredLL = this.filterExtremes(
+      df.filter((row) => row.low),
       'low',
-      troughMinDistances[timeframe],
+      0.02,
     );
 
-    const validPeaks = filteredHh.slice(-3);
-    const validTroughs = filteredLl.slice(-3);
+    // Kiểm tra phân kỳ
+    const peakDivergence = this.detectPeakDivergence(filteredHH);
+    const troughDivergence = this.detectTroughDivergence(filteredLL);
 
-    let latestDivergence = null;
-
-    for (let i = 0; i < validPeaks.length; i++) {
-      for (let j = i + 1; j < validPeaks.length; j++) {
-        const rsiDiff = Math.abs(rsi[i] - rsi[j]);
-        if (
-          rsiDiff >= 5 &&
-          rsi[i] < rsi[j] &&
-          validPeaks[i].high > validPeaks[j].high
-        ) {
-          latestDivergence = `${symbol} - Phân kỳ đỉnh - ${timeframe}`;
-          break;
-        }
-      }
-      if (latestDivergence) break;
-    }
-
-    if (!latestDivergence) {
-      for (let i = 0; i < validTroughs.length; i++) {
-        for (let j = i + 1; j < validTroughs.length; j++) {
-          const rsiDiff = Math.abs(rsi[i] - rsi[j]);
-          if (
-            rsiDiff >= 5 &&
-            rsi[i] > rsi[j] &&
-            validTroughs[i].low < validTroughs[j].low
-          ) {
-            latestDivergence = `${symbol} - Phân kỳ đáy - ${timeframe}`;
-            break;
-          }
-        }
-        if (latestDivergence) break;
-      }
-    }
-
-    return latestDivergence;
+    return { peakDivergence, troughDivergence };
   }
 
-  // Hàm chính để phân tích phân kỳ gần nhất
-  async analyzeDivergence(symbols: string[], timeframes: string[]) {
-    const results = [];
+  // Kiểm tra phân kỳ đỉnh
+  detectPeakDivergence(peaks: any[]): string | null {
+    for (let i = 1; i < peaks.length; i++) {
+      const currentPeak = peaks[i];
+      const previousPeak = peaks[i - 1];
+      if (
+        currentPeak.rsi < previousPeak.rsi &&
+        currentPeak.high > previousPeak.high
+      ) {
+        return 'Phân kỳ đỉnh';
+      }
+    }
+    return null;
+  }
+
+  // Kiểm tra phân kỳ đáy
+  detectTroughDivergence(troughs: any[]): string | null {
+    for (let i = 1; i < troughs.length; i++) {
+      const currentTrough = troughs[i];
+      const previousTrough = troughs[i - 1];
+      if (
+        currentTrough.rsi > previousTrough.rsi &&
+        currentTrough.low < previousTrough.low
+      ) {
+        return 'Phân kỳ đáy';
+      }
+    }
+    return null;
+  }
+
+  async analyzeDivergences(symbols: string[], timeframes: string[]) {
+    const results: string[] = [];
 
     for (const symbol of symbols) {
       for (const timeframe of timeframes) {
-        const data = await this.getOhlcv(symbol, timeframe);
-        const divergence = this.checkLatestDivergence(data, symbol, timeframe);
-        if (divergence) {
-          results.push(divergence);
+        const result = await this.checkLatestDivergence(symbol, timeframe, 1.5);
+
+        if (result.peakDivergence) {
+          const peakMessage = `${symbol} - ${timeframe} - ${result.peakDivergence}`;
+          results.push(peakMessage);
+        }
+
+        if (result.troughDivergence) {
+          const troughMessage = `${symbol} - ${timeframe} - ${result.troughDivergence}`;
+          results.push(troughMessage);
         }
       }
     }
-
-    results.sort((a, b) => {
-      const [, aType, aTimeframe] = a.split(' - ');
-      const [, bType, bTimeframe] = b.split(' - ');
-      return aType.localeCompare(bType) || aTimeframe.localeCompare(bTimeframe);
-    });
     return results;
   }
 }
