@@ -19,12 +19,7 @@ export class DivergenceService {
   }
 
   async getOHLCV(symbol: string, timeframe: string, limit: number) {
-    const ohlcv = await this.exchange.fetchOHLCV(
-      symbol,
-      timeframe,
-      limit,
-      limit,
-    );
+    const ohlcv = await this.exchange.fetchOHLCV(symbol, timeframe, limit);
     return ohlcv.map((item) => ({
       timestamp: moment(item[0]).format('YYYY-MM-DD HH:mm:ss'),
       open: item[1],
