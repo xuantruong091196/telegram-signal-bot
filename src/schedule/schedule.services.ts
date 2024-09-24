@@ -162,8 +162,6 @@ export class ScheduledTaskService implements OnModuleInit {
   }
   @Cron(CronExpression.EVERY_2_HOURS)
   async handleCron() {
-    console.log('Running scheduled task for divergence analysis');
-
     await this.runTask();
   }
   private async runTask() {
@@ -187,9 +185,9 @@ export class ScheduledTaskService implements OnModuleInit {
       }
 
       // Gửi từng chunk qua alertService
-      for (const chunk of resultChunks) {
-        await this.alertService.process(chunk).toPromise(); // Sử dụng toPromise để đợi mỗi chunk gửi xong trước khi gửi chunk tiếp theo
-      }
+      // for (const chunk of resultChunks) {
+      //   await this.alertService.process(chunk).toPromise(); // Sử dụng toPromise để đợi mỗi chunk gửi xong trước khi gửi chunk tiếp theo
+      // }
     } else {
       console.log('No divergences found.');
     }

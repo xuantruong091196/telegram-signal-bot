@@ -10,8 +10,8 @@ import { TelegramService } from 'nestjs-telegram';
 import { catchError, map } from 'rxjs/operators';
 import { Observable, throwError } from 'rxjs';
 import { TelegramMessage } from 'nestjs-telegram/dist/interfaces/telegramTypes.interface';
-import { BingxService } from '../bingx/bingx.service';
-import { generateParams } from 'src/config/constant';
+// import { BingxService } from '../bingx/bingx.service';
+// import { generateParams } from 'src/config/constant';
 @Injectable()
 export class AlertsService {
   private readonly logger = new Logger(AlertsService.name);
@@ -51,7 +51,36 @@ export class AlertsService {
         }),
       );
   }
-
+  smcAlerts(message: string): Observable<TelegramMessage> {
+    return this.telegramService
+      .sendMessage({
+        chat_id: this.configService.get<string>('telegram.chatId'),
+        text: message,
+        parse_mode: 'html',
+      })
+      .pipe(
+        map((res: any) => {
+          this.logger.verbose(
+            `Successfully sent message with id ${res.message_id}! `,
+          );
+          return res;
+        }),
+        catchError((err: any) => {
+          if (
+            err.response?.statusCode === 429 ||
+            err.response?.statusCode === 400
+          ) {
+            this.logger.warn('Rate limit exceeded. Retrying after delay...');
+            return new Observable((observer) => {
+              setTimeout(() => {
+                this.smcAlerts(message).subscribe(observer);
+              }, 20000);
+            });
+          }
+          return this.processError(err);
+        }),
+      );
+  }
   private processError(err: any): Observable<never> {
     if (err.response) {
       this.logger.error(

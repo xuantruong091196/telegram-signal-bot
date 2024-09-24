@@ -14,4 +14,10 @@ export class AlertsController {
     this.logger.verbose(`>>>> alerts (POST). Body: '${message}'`);
     return this.alertsService.process(message);
   }
+
+  @Post('/smc')
+  smcAlert(@Body() message: string): Observable<TelegramMessage> {
+    this.logger.verbose(`>>>> alerts (POST). Body: '${message}'`);
+    return this.alertsService.smcAlerts(message);
+  }
 }
